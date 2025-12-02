@@ -191,9 +191,12 @@
                     </div>
                 </div>
                 
-                <!-- Camera Section -->
+                <!-- Camera Section (now includes overlay + Auto Capture UI) -->
                 <div id="camera-section" class="text-center mb-4" style="display: none;">
-                    <video id="camera-stream" class="w-100 rounded mb-3" autoplay playsinline style="max-width: 400px; border: 2px solid #ddd;"></video>
+                    <div id="camera-view" class="position-relative mx-auto mb-3" style="max-width:400px;">
+                        <video id="camera-stream" class="w-100 rounded" autoplay playsinline style="border: 2px solid #ddd; display:block; background:#000;"></video>
+                        <canvas id="leaf-overlay" class="position-absolute top-0 start-0 w-100 h-100" style="pointer-events:none;"></canvas>
+                    </div>
                     <canvas id="capture-canvas" style="display: none;"></canvas>
                     <div id="camera-error" class="alert alert-danger" style="display: none;">
                         Could not access camera. Please ensure you've granted camera permissions.
@@ -205,9 +208,14 @@
                         <button type="button" class="btn btn-secondary" id="close-camera-btn">
                             <i class="bi bi-x-circle"></i> Close Camera
                         </button>
+                        <button type="button" class="btn btn-outline-success" id="auto-capture-btn">
+                            <i class="bi bi-magic"></i> Auto Capture
+                        </button>
                     </div>
                     <p class="text-muted small mt-2">Point camera at a plant leaf and capture the photo</p>
+                    <p class="text-muted small mb-0 d-none" id="auto-capture-status"></p>
                 </div>
+
                 <div class="preview-area" id="preview-area">
                     <!-- Image previews will be added here -->
                 </div>
@@ -230,144 +238,415 @@
             <span class="text-muted">&copy; 2025 Plant Disease Detection &mdash; Powered by a trained machine learning (deep learning) model</span>
         </div>
     </footer>
+
     <script>
+    // Auto-capture + overlay script
+    document.addEventListener('DOMContentLoaded', () => {
         const MAX_FILES = 15;
-
-        function previewImages(event) {
-            const previewArea = document.getElementById('preview-area');
-            const files = event.target.files;
-
-            if (files.length > MAX_FILES) {
-                alert(`You can only upload a maximum of ${MAX_FILES} images.`);
-                event.target.value = ""; // Clear the file input
-                previewArea.innerHTML = ''; // Clear previews
-                return;
-            }
-
-            previewArea.innerHTML = ''; // Clear previous previews
-            for (const file of files) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const img = document.createElement('img');
-                    img.src = e.target.result;
-                    img.classList.add('preview-image');
-                    previewArea.appendChild(img);
-                }
-                reader.readAsDataURL(file);
-            }
-        }
-
-        // Progress bar animation (fake for demo, real would require AJAX)
-        document.getElementById('upload-form').addEventListener('submit', function(e) {
-            const progress = document.getElementById('upload-progress');
-            const bar = progress.querySelector('.progress-bar');
-            progress.classList.remove('d-none');
-            let width = 0;
-            const interval = setInterval(() => {
-                width += 10;
-                bar.style.width = width + '%';
-                if (width >= 100) {
-                    clearInterval(interval);
-                }
-            }, 80);
-        });
-
-        // Camera Implementation
+        const fileInput = document.getElementById('image');
+        const previewArea = document.getElementById('preview-area');
         const cameraBtn = document.getElementById('camera-btn');
         const cameraSection = document.getElementById('camera-section');
         const video = document.getElementById('camera-stream');
-        const canvas = document.getElementById('capture-canvas');
+        const captureCanvas = document.getElementById('capture-canvas');
         const captureBtn = document.getElementById('capture-btn');
         const closeCameraBtn = document.getElementById('close-camera-btn');
-        const imageInput = document.getElementById('image');
-        let mediaStream = null;
+        const autoCaptureBtn = document.getElementById('auto-capture-btn');
+        const autoCaptureStatus = document.getElementById('auto-capture-status');
+        const leafOverlay = document.getElementById('leaf-overlay');
+        const cameraView = document.getElementById('camera-view');
 
-        // Camera button click handler
-        cameraBtn.addEventListener('click', async () => {
+        // small sample canvas for leaf detection
+        const sampleCanvas = document.createElement('canvas');
+        let sampleCtx = null;
+        try { sampleCtx = sampleCanvas.getContext('2d'); } catch (e) { sampleCtx = null; }
+
+        let leafOverlayCtx = null;
+        try { leafOverlayCtx = leafOverlay && leafOverlay.getContext ? leafOverlay.getContext('2d') : null; } catch (e) { leafOverlayCtx = null; }
+
+        // Auto capture settings
+        const SAMPLE_W = 160, SAMPLE_H = 120;
+        const AUTO_SAMPLE_MS = 400;
+        const AUTO_STABLE_FRAMES = 4;
+        const STABILITY_DELTA = 0.08;
+        const LEAF_MIN_COVERAGE = 0.07;
+        const CAPTURE_PADDING = 0.15;
+        const MIN_CAPTURE_SIZE = 0.45;
+
+        let mediaStream = null;
+        let autoCaptureEnabled = false;
+        let intervalId = null;
+        let lastCoverage = null;
+        let stableCount = 0;
+        let lastBounds = null;
+        let lastCaptureBounds = null;
+
+        // helper: show file previews
+        function previewImages(event) {
+            const files = event?.target?.files || [];
+            if (!previewArea) return;
+            if (files.length > MAX_FILES) {
+                alert(`You can only upload a maximum of ${MAX_FILES} images.`);
+                if (fileInput) fileInput.value = "";
+                previewArea.innerHTML = '';
+                return;
+            }
+            previewArea.innerHTML = '';
+            for (const f of files) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.className = 'preview-image';
+                    previewArea.appendChild(img);
+                };
+                reader.readAsDataURL(f);
+            }
+        }
+        if (fileInput) fileInput.addEventListener('change', previewImages);
+
+        // overlay sizing sync
+        function syncOverlaySize() {
+            if (!leafOverlay || !cameraView) return;
+            const rect = cameraView.getBoundingClientRect();
+            const w = Math.max(1, Math.round(rect.width));
+            const h = Math.max(1, Math.round(rect.height));
+            if (leafOverlay.width !== w || leafOverlay.height !== h) {
+                leafOverlay.width = w;
+                leafOverlay.height = h;
+            }
+        }
+        window.addEventListener('resize', syncOverlaySize);
+        video && video.addEventListener('loadedmetadata', syncOverlaySize);
+
+        function clearOverlay() {
+            if (!leafOverlayCtx || !leafOverlay) return;
+            leafOverlayCtx.clearRect(0, 0, leafOverlay.width, leafOverlay.height);
+        }
+
+        function drawOverlay(bounds) {
+            if (!bounds) { clearOverlay(); return; }
+            syncOverlaySize();
+            if (!leafOverlayCtx) return;
+            leafOverlayCtx.clearRect(0, 0, leafOverlay.width, leafOverlay.height);
+            leafOverlayCtx.strokeStyle = 'rgba(40,167,69,0.95)';
+            leafOverlayCtx.lineWidth = 3;
+            if (leafOverlayCtx.setLineDash) leafOverlayCtx.setLineDash([12, 6]);
+            const sx = bounds.x * leafOverlay.width;
+            const sy = bounds.y * leafOverlay.height;
+            const sw = bounds.width * leafOverlay.width;
+            const sh = bounds.height * leafOverlay.height;
+            leafOverlayCtx.strokeRect(sx, sy, sw, sh);
+        }
+
+        // color test for likely leaf pixels (hue-based)
+        function isLeafPixel(r, g, b) {
+            const rn = r/255, gn = g/255, bn = b/255;
+            const max = Math.max(rn, gn, bn), min = Math.min(rn, gn, bn);
+            const delta = max - min;
+            if (delta < 0.05) return false;
+            let hue;
+            if (max === rn) hue = ((gn - bn) / delta) % 6;
+            else if (max === gn) hue = (bn - rn) / delta + 2;
+            else hue = (rn - gn) / delta + 4;
+            hue *= 60; if (hue < 0) hue += 360;
+            const sat = max === 0 ? 0 : delta / max;
+            const val = max;
+            return (hue >= 55 && hue <= 160 && sat >= 0.25 && val >= 0.2);
+        }
+
+        // detect leaf bounds on downsampled frame
+        function detectLeaf(sampleW, sampleH) {
+            if (!sampleCtx || !video || video.readyState < 2) return null;
+            sampleCanvas.width = sampleW;
+            sampleCanvas.height = sampleH;
+            sampleCtx.drawImage(video, 0, 0, sampleW, sampleH);
             try {
-                // Show camera section
+                const data = sampleCtx.getImageData(0,0,sampleW,sampleH).data;
+                let minX = Infinity, minY = Infinity, maxX = -1, maxY = -1;
+                let count = 0;
+                for (let y=0;y<sampleH;y++){
+                    for (let x=0;x<sampleW;x++){
+                        const i = (y*sampleW + x) * 4;
+                        const r = data[i], g = data[i+1], b = data[i+2];
+                        if (isLeafPixel(r,g,b)) {
+                            count++;
+                            if (x < minX) minX = x;
+                            if (y < minY) minY = y;
+                            if (x > maxX) maxX = x;
+                            if (y > maxY) maxY = y;
+                        }
+                    }
+                }
+                const coverage = count / (sampleW * sampleH);
+                if (coverage < LEAF_MIN_COVERAGE || minX === Infinity) return null;
+                const pad = 6;
+                minX = Math.max(0, minX - pad); minY = Math.max(0, minY - pad);
+                maxX = Math.min(sampleW - 1, maxX + pad); maxY = Math.min(sampleH - 1, maxY + pad);
+                return {
+                    coverage,
+                    normalizedBounds: {
+                        x: minX/sampleW,
+                        y: minY/sampleH,
+                        width: (maxX - minX)/sampleW,
+                        height: (maxY - minY)/sampleH
+                    }
+                };
+            } catch (err) {
+                // read permission error or cross-origin -- treat as no detection
+                return null;
+            }
+        }
+
+        function expandAndClamp(bounds, padding) {
+            const x1 = Math.max(0, bounds.x - padding);
+            const y1 = Math.max(0, bounds.y - padding);
+            const x2 = Math.min(1, bounds.x + bounds.width + padding);
+            const y2 = Math.min(1, bounds.y + bounds.height + padding);
+            return {
+                x: x1, y: y1, width: Math.max(0.05, x2 - x1), height: Math.max(0.05, y2 - y1)
+            };
+        }
+
+        function ensureMinSize(bounds) {
+            const centerX = bounds.x + bounds.width / 2;
+            const centerY = bounds.y + bounds.height / 2;
+            const finalW = Math.min(1, Math.max(bounds.width, MIN_CAPTURE_SIZE));
+            const finalH = Math.min(1, Math.max(bounds.height, MIN_CAPTURE_SIZE));
+            let nx = centerX - finalW/2;
+            let ny = centerY - finalH/2;
+            nx = Math.max(0, Math.min(nx, 1 - finalW));
+            ny = Math.max(0, Math.min(ny, 1 - finalH));
+            return { x: nx, y: ny, width: finalW, height: finalH };
+        }
+
+        function computeCaptureBounds(bounds) {
+            return ensureMinSize(expandAndClamp(bounds, CAPTURE_PADDING));
+        }
+
+        // build export canvas from full resolution capture canvas and computed bounds
+        function buildExportCanvas(srcCanvas) {
+            const boundsToUse = lastCaptureBounds || lastBounds;
+            if (!boundsToUse) {
+                // fallback: center crop to reduce background
+                const cropFrac = 0.6;
+                const sw = Math.floor(srcCanvas.width * cropFrac);
+                const sh = Math.floor(srcCanvas.height * cropFrac);
+                const sx = Math.floor((srcCanvas.width - sw) / 2);
+                const sy = Math.floor((srcCanvas.height - sh) / 2);
+                const out = document.createElement('canvas');
+                out.width = srcCanvas.width;
+                out.height = srcCanvas.height;
+                out.getContext('2d').drawImage(srcCanvas, sx, sy, sw, sh, 0, 0, out.width, out.height);
+                return out;
+            }
+
+            const normalized = computeCaptureBounds(boundsToUse);
+            let sx = Math.floor(normalized.x * srcCanvas.width);
+            let sy = Math.floor(normalized.y * srcCanvas.height);
+            let sw = Math.floor(normalized.width * srcCanvas.width);
+            let sh = Math.floor(normalized.height * srcCanvas.height);
+
+            sw = Math.max(1, Math.min(sw, srcCanvas.width - sx));
+            sh = Math.max(1, Math.min(sh, srcCanvas.height - sy));
+
+            const exportCanvas = document.createElement('canvas');
+            // if region is small, zoom to full size for better model input
+            const SMALL_THRESHOLD = 0.45;
+            const widthRatio = sw / srcCanvas.width;
+            const heightRatio = sh / srcCanvas.height;
+            if (widthRatio < SMALL_THRESHOLD || heightRatio < SMALL_THRESHOLD) {
+                exportCanvas.width = srcCanvas.width;
+                exportCanvas.height = srcCanvas.height;
+                exportCanvas.getContext('2d').drawImage(srcCanvas, sx, sy, sw, sh, 0, 0, exportCanvas.width, exportCanvas.height);
+            } else {
+                exportCanvas.width = sw;
+                exportCanvas.height = sh;
+                exportCanvas.getContext('2d').drawImage(srcCanvas, sx, sy, sw, sh, 0, 0, sw, sh);
+            }
+            return exportCanvas;
+        }
+
+        // convert canvas -> file and set file input
+        function insertFileIntoInput(canvas, filename = 'camera-capture.jpg', quality = 0.9) {
+            canvas.toBlob(blob => {
+                if (!blob || !fileInput) return;
+                const file = new File([blob], filename, { type: 'image/jpeg' });
+                const dt = new DataTransfer();
+                dt.items.add(file);
+                fileInput.files = dt.files;
+                previewImages({ target: fileInput });
+            }, 'image/jpeg', quality);
+        }
+
+        // capture full resolution frame + crop and insert file
+        function captureCurrentFrame(isAuto = false) {
+            if (!mediaStream || !video || !captureCanvas) return;
+            if (!lastBounds) refreshLastBounds();
+            const w = video.videoWidth || 1280;
+            const h = video.videoHeight || 720;
+            captureCanvas.width = w;
+            captureCanvas.height = h;
+            const ctx = captureCanvas.getContext('2d');
+            if (!ctx) return;
+            ctx.drawImage(video, 0, 0, w, h);
+            const exportCanvas = buildExportCanvas(captureCanvas);
+            if (!exportCanvas) return;
+            insertFileIntoInput(exportCanvas, isAuto ? 'auto-capture.jpg' : 'camera-capture.jpg', 0.92);
+            // stop camera UI
+            stopCamera();
+            cameraSection.style.display = 'none';
+            cameraBtn.style.display = 'block';
+            showCaptureMessage(isAuto ? 'Auto capture complete! Ready for analysis.' : 'Photo captured successfully! Ready for analysis.');
+        }
+
+        function showCaptureMessage(text) {
+            const existing = document.querySelector('.camera-flash-message');
+            if (existing) existing.remove();
+            const el = document.createElement('div');
+            el.className = 'alert alert-success alert-dismissible fade show camera-flash-message mt-3';
+            el.innerHTML = `<i class="bi bi-check-circle"></i> ${text} <button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+            cameraSection && cameraSection.parentNode.insertBefore(el, cameraSection.nextSibling);
+        }
+
+        // Auto capture monitoring loop
+        function startAutoMonitor() {
+            if (intervalId) return;
+            intervalId = setInterval(() => {
+                if (!video || !mediaStream || video.readyState < 2 || !video.videoWidth) return;
+                const sampleW = SAMPLE_W, sampleH = SAMPLE_H;
+                sampleCanvas.width = sampleW;
+                sampleCanvas.height = sampleH;
+                try {
+                    sampleCtx.drawImage(video, 0, 0, sampleW, sampleH);
+                } catch (e) {
+                    // drawing may fail if frame not ready
+                    return;
+                }
+                const detection = detectLeaf(sampleW, sampleH);
+                if (!detection) {
+                    stableCount = 0;
+                    lastCoverage = null;
+                    lastBounds = null;
+                    lastCaptureBounds = null;
+                    clearOverlay();
+                    if (autoCaptureStatus) { autoCaptureStatus.classList.remove('d-none'); autoCaptureStatus.textContent = 'Point the camera so the leaf fills the frame.'; }
+                    return;
+                }
+                lastBounds = detection.normalizedBounds;
+                lastCaptureBounds = computeCaptureBounds(lastBounds);
+                drawOverlay(lastCaptureBounds);
+                const coverage = detection.coverage;
+                if (lastCoverage !== null && Math.abs(coverage - lastCoverage) < STABILITY_DELTA) {
+                    stableCount++;
+                    if (autoCaptureStatus) autoCaptureStatus.textContent = `Leaf locked (${stableCount}/${AUTO_STABLE_FRAMES})`;
+                    if (stableCount >= AUTO_STABLE_FRAMES) {
+                        // capture and stop
+                        captureCurrentFrame(true);
+                        stopAutoMonitor();
+                        if (autoCaptureStatus) { autoCaptureStatus.classList.remove('d-none'); autoCaptureStatus.textContent = 'Captured automatically'; }
+                    }
+                } else {
+                    stableCount = 1;
+                    if (autoCaptureStatus) autoCaptureStatus.textContent = 'Leaf found, stabilizing...';
+                }
+                lastCoverage = coverage;
+            }, AUTO_SAMPLE_MS);
+        }
+
+        function stopAutoMonitor() {
+            if (intervalId) clearInterval(intervalId);
+            intervalId = null;
+            stableCount = 0;
+            lastCoverage = null;
+            lastBounds = null;
+            lastCaptureBounds = null;
+            clearOverlay();
+        }
+
+        function enableAuto() {
+            autoCaptureEnabled = true;
+            if (autoCaptureBtn) { autoCaptureBtn.classList.add('camera-active'); autoCaptureBtn.innerHTML = '<i class="bi bi-record-circle"></i> Auto Capture ON'; }
+            if (autoCaptureStatus) { autoCaptureStatus.classList.remove('d-none'); autoCaptureStatus.textContent = 'Waiting for a steady leaf...'; }
+            startAutoMonitor();
+        }
+
+        function disableAuto(msg) {
+            autoCaptureEnabled = false;
+            if (autoCaptureBtn) { autoCaptureBtn.classList.remove('camera-active'); autoCaptureBtn.innerHTML = '<i class="bi bi-magic"></i> Auto Capture'; }
+            if (autoCaptureStatus) {
+                if (msg) { autoCaptureStatus.classList.remove('d-none'); autoCaptureStatus.textContent = msg; }
+                else autoCaptureStatus.classList.add('d-none');
+            }
+            stopAutoMonitor();
+        }
+
+        // refresh bounds immediately from frame (one-shot)
+        function refreshLastBounds() {
+            if (!video || !sampleCtx) return;
+            const sw = SAMPLE_W, sh = SAMPLE_H;
+            sampleCanvas.width = sw; sampleCanvas.height = sh;
+            try { sampleCtx.drawImage(video, 0, 0, sw, sh); } catch (e) { return; }
+            const det = detectLeaf(sw, sh);
+            if (det) {
+                lastBounds = det.normalizedBounds;
+                lastCaptureBounds = computeCaptureBounds(lastBounds);
+                drawOverlay(lastCaptureBounds);
+            }
+        }
+
+        // camera lifecycle
+        async function startCamera() {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                document.getElementById('camera-error').style.display = 'block';
+                return;
+            }
+            try {
                 cameraSection.style.display = 'block';
                 cameraBtn.style.display = 'none';
-                
-                // Initialize camera
                 mediaStream = await navigator.mediaDevices.getUserMedia({
-                    video: { 
-                        facingMode: 'environment',
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    },
+                    video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
                     audio: false
                 });
-                
                 video.srcObject = mediaStream;
                 document.getElementById('camera-error').style.display = 'none';
-                
+                requestAnimationFrame(syncOverlaySize);
+                // auto-enable auto-capture only if user toggles it or initially choose to
+                if (autoCaptureEnabled) enableAuto();
             } catch (err) {
                 console.error('Camera error:', err);
                 document.getElementById('camera-error').style.display = 'block';
                 cameraSection.style.display = 'none';
                 cameraBtn.style.display = 'block';
             }
-        });
-
-        // Close camera button
-        closeCameraBtn.addEventListener('click', () => {
-            stopCamera();
-            cameraSection.style.display = 'none';
-            cameraBtn.style.display = 'block';
-        });
-
-        // Capture photo button
-        captureBtn.addEventListener('click', () => {
-            if (!mediaStream) return;
-            
-            // Set canvas dimensions to match video
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            
-            // Draw video frame to canvas
-            const context = canvas.getContext('2d');
-            context.drawImage(video, 0, 0);
-            
-            // Convert canvas to blob and create file
-            canvas.toBlob(blob => {
-                const file = new File([blob], 'camera-capture.jpg', { type: 'image/jpeg' });
-                
-                // Create DataTransfer object and add the file
-                const dataTransfer = new DataTransfer();
-                dataTransfer.items.add(file);
-                imageInput.files = dataTransfer.files;
-                
-                // Trigger preview
-                previewImages({target: imageInput});
-                
-                // Stop camera and hide section
-                stopCamera();
-                cameraSection.style.display = 'none';
-                cameraBtn.style.display = 'block';
-                
-                // Show success message
-                const successMsg = document.createElement('div');
-                successMsg.className = 'alert alert-success alert-dismissible fade show';
-                successMsg.innerHTML = `
-                    <i class="bi bi-check-circle"></i> Photo captured successfully! Ready for analysis.
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                `;
-                cameraSection.parentNode.insertBefore(successMsg, cameraSection.nextSibling);
-                
-            }, 'image/jpeg', 0.9);
-        });
+        }
 
         function stopCamera() {
             if (mediaStream) {
-                mediaStream.getTracks().forEach(track => track.stop());
+                mediaStream.getTracks().forEach(t => t.stop());
                 mediaStream = null;
                 video.srcObject = null;
             }
+            disableAuto('Camera closed');
         }
 
-        // Clean up camera when page is unloaded
+        // event wiring
+        cameraBtn.addEventListener('click', startCamera);
+        closeCameraBtn.addEventListener('click', () => { stopCamera(); cameraSection.style.display = 'none'; cameraBtn.style.display = 'block'; });
+        captureBtn.addEventListener('click', () => captureCurrentFrame(false));
+        autoCaptureBtn.addEventListener('click', () => {
+            if (!mediaStream) {
+                if (!cameraSection || cameraSection.style.display === 'none') {
+                    // open camera then enable auto when started
+                    startCamera().then(() => { autoCaptureEnabled = true; enableAuto(); });
+                    return;
+                }
+            }
+            if (autoCaptureEnabled) disableAuto('Auto capture paused'); else { autoCaptureEnabled = true; enableAuto(); }
+        });
+
         window.addEventListener('beforeunload', stopCamera);
+    });
     </script>
 </body>
 </html>
