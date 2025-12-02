@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>Welcome • Plant Disease Detector</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+	<style>
+		:root{
+			--bg1:#0f2027; /* Deep green/blue */
+			--bg2:#203a43;
+			--bg3:#2c5364;
+			--accent:#32d17c;
+			--accent-2:#8be28a;
+			--text:#e9f5ef;
+			--muted:#b9d7c7;
+			--card:#12252d;
+			--shadow: 0 20px 50px rgba(0,0,0,0.4);
+		}
+		*{ box-sizing: border-box; }
+		html, body{
+			height:100%;
+			margin:0;
+			font-family: 'Poppins', system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+			color:var(--text);
+			background: linear-gradient(135deg, var(--bg1), var(--bg2), var(--bg3));
+			background-size: 200% 200%;
+			animation: gradientMove 15s ease infinite;
+		}
+		@keyframes gradientMove{
+			0%{ background-position: 0% 50%; }
+			50%{ background-position: 100% 50%; }
+			100%{ background-position: 0% 50%; }
+		}
+		.container{
+			min-height:100%;
+			display:flex;
+			align-items:center;
+			justify-content:center;
+			padding: 32px 20px;
+		}
+		.hero{
+			width: min(1100px, 100%);
+			display:grid;
+			grid-template-columns: 1.1fr 0.9fr;
+			gap: 28px;
+			align-items: center;
+		}
+		@media (max-width: 980px){
+			.hero{ grid-template-columns: 1fr; text-align: center; }
+			.actions{ justify-content: center; }
+			.stat-grid{ justify-content: center; }
+		}
+		.card{
+			background: linear-gradient(180deg, rgba(18,37,45,0.8), rgba(18,37,45,0.6));
+			border: 1px solid rgba(255,255,255,0.06);
+			border-radius: 20px;
+			box-shadow: var(--shadow);
+			backdrop-filter: blur(10px);
+		}
+		.left.card{
+			padding: 36px;
+		}
+		.badge{
+			display:inline-flex;
+			align-items:center;
+			gap:10px;
+			padding:8px 14px;
+			border-radius:999px;
+			background: rgba(50, 209, 124, 0.12);
+			border:1px solid rgba(139, 226, 138, 0.35);
+			color:var(--accent-2);
+			font-weight:600;
+			font-size: 13px;
+			letter-spacing: 0.3px;
+		}
+		h1{
+			margin:16px 0 12px;
+			font-size: clamp(28px, 5vw, 46px);
+			line-height: 1.15;
+			font-weight: 700;
+		}
+		.subtitle{
+			color:var(--muted);
+			font-weight:400;
+			font-size: clamp(14px, 2.2vw, 17px);
+			line-height:1.7;
+			margin-bottom: 26px;
+		}
+		.actions{
+			display:flex;
+			gap:14px;
+			flex-wrap:wrap;
+		}
+		html{ scroll-behavior: smooth; }
+		.btn{
+			display:inline-flex;
+			align-items:center;
+			justify-content:center;
+			gap:10px;
+			padding: 14px 20px;
+			border-radius: 12px;
+			font-weight:600;
+			cursor:pointer;
+			text-decoration:none;
+			transition: transform .12s ease, box-shadow .12s ease, background .2s ease;
+			user-select:none;
+			border:1px solid transparent;
+		}
+		.btn:active{ transform: translateY(1px); }
+		.btn-primary{
+			color:#09351d;
+			background: linear-gradient(180deg, var(--accent), #21c16b);
+			box-shadow: 0 10px 25px rgba(50,209,124,0.3);
+		}
+		.btn-primary:hover{
+			box-shadow: 0 14px 32px rgba(50,209,124,0.35);
+		}
+		.btn-ghost{
+			color: #e9f5ef;
+			background: rgba(255,255,255,0.06);
+			border-color: rgba(233, 245, 239, 0.35);
+			box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+		}
+		.btn-ghost:hover{
+			background: rgba(233, 245, 239, 0.12);
+		}
+		.stat-grid{
+			display:flex;
+			gap:16px;
+			flex-wrap:wrap;
+			margin-top: 26px;
+		}
+		.stat{
+			background: rgba(255,255,255,0.04);
+			border:1px solid rgba(255,255,255,0.08);
+			border-radius: 14px;
+			padding: 14px 16px;
+			min-width: 140px;
+		}
+		.stat .num{
+			font-size: 22px;
+			font-weight: 700;
+			color: var(--accent-2);
+		}
+		.stat .lbl{
+			color: var(--muted);
+			font-size: 12px;
+			margin-top: 4px;
+			letter-spacing: .2px;
+		}
+		.right.card{
+			position: relative;
+			padding: 0;
+			overflow: hidden;
+			min-height: 360px;
+		}
+		.leaf{
+			position:absolute;
+			inset:0;
+			background:
+				radial-gradient(120px 120px at 20% 20%, rgba(50,209,124,0.35), transparent 60%),
+				radial-gradient(200px 200px at 80% 30%, rgba(139,226,138,0.28), transparent 60%),
+				radial-gradient(160px 160px at 40% 80%, rgba(120,210,170,0.25), transparent 60%);
+			filter: blur(4px);
+		}
+		.mock{
+			position: relative;
+			z-index: 2;
+			display: grid;
+			grid-template-rows: 60px 1fr;
+			height: 100%;
+		}
+		.mock .bar{
+			display:flex;
+			align-items:center;
+			gap:8px;
+			padding: 10px 14px;
+			background: rgba(255,255,255,0.06);
+			border-bottom: 1px solid rgba(255,255,255,0.08);
+		}
+		.dot{
+			width:10px; height:10px; border-radius:50%;
+			background:#ff7b7b;
+			box-shadow:
+				16px 0 0 #ffd47b,
+				32px 0 0 #7bff9b;
+		}
+		.mock .content{
+			display:grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 16px;
+			padding: 16px;
+		}
+		.mock .tile{
+			background: rgba(255,255,255,0.05);
+			border:1px solid rgba(255,255,255,0.08);
+			border-radius: 12px;
+			min-height: 120px;
+			position:relative;
+			overflow: hidden;
+		}
+		.tile .tile-content{
+			position: relative;
+			z-index: 3;
+			padding: 14px;
+			display:flex;
+			flex-direction:column;
+			justify-content:space-between;
+			height:100%;
+		}
+		.tile h4{
+			margin: 0 0 6px 0;
+			font-size: 14px;
+			letter-spacing: .3px;
+			font-weight: 700;
+			color: #eaf9f1;
+			text-transform: uppercase;
+		}
+		.tile p{
+			margin: 0;
+			color: var(--muted);
+			font-size: 12px;
+			line-height: 1.5;
+		}
+		.sparkle{
+			position:absolute;
+			inset:-40%;
+			background: conic-gradient(from 0deg, rgba(255,255,255,0.06), transparent 30%, rgba(255,255,255,0.06) 60%, transparent 100%);
+			filter: blur(14px);
+			animation: spin 18s linear infinite;
+		}
+		@keyframes spin{ to { transform: rotate(360deg); } }
+		.small-note{
+			margin-top: 10px;
+			color: var(--muted);
+			font-size: 12px;
+		}
+		.footer{
+			text-align:center;
+			color: var(--muted);
+			font-size: 12px;
+			margin-top: 22px;
+			opacity: .8;
+		}
+		/* Learn section */
+		.learn-wrap{
+			width:min(1100px, 100%);
+			margin: 30px auto 10px;
+		}
+		.learn{
+			display:grid;
+			grid-template-columns: 1.1fr 0.9fr;
+			gap: 20px;
+		}
+		@media (max-width: 980px){
+			.learn{ grid-template-columns: 1fr; }
+		}
+		.learn .panel{
+			background: rgba(255,255,255,0.05);
+			border:1px solid rgba(255,255,255,0.08);
+			border-radius: 16px;
+			box-shadow: var(--shadow);
+			padding: 20px 20px;
+		}
+		.learn h2{
+			margin: 0 0 6px;
+			font-size: clamp(22px, 4vw, 30px);
+		}
+		.lead{
+			color: var(--muted);
+			margin: 0 0 10px;
+			line-height: 1.7;
+		}
+		.checklist{
+			margin: 10px 0 0;
+			padding: 0;
+			list-style: none;
+			display:grid;
+			gap: 10px;
+		}
+		.checklist li{
+			display:flex;
+			gap:10px;
+			align-items:flex-start;
+			background: rgba(255,255,255,0.04);
+			border:1px solid rgba(255,255,255,0.07);
+			border-radius: 12px;
+			padding: 12px 12px;
+		}
+		.check{
+			color: var(--accent-2);
+			font-weight: 700;
+		}
+		.kv{
+			display:grid;
+			grid-template-columns: 140px 1fr;
+			gap: 8px 14px;
+			margin-top: 6px;
+		}
+		.kv .k{ color: var(--muted); }
+		.kv .v{ color: var(--text); }
+	</style>
+</head>
+<body>
+	<div class="container">
+		<section class="hero">
+			<div class="left card">
+				<span class="badge">ML-powered • Plant Health</span>
+				<h1>Diagnose Plant Diseases in Seconds</h1>
+				<p class="subtitle">
+					Upload leaf photos and get instant detection with treatment guidance.
+					Boost crop health, reduce losses, and act fast with confidence.
+				</p>
+				<div class="actions">
+					<a class="btn btn-primary" href="{{ url_for('start') }}">Start Detection</a>
+					<a class="btn btn-ghost" href="#learn">Learn more</a>
+				</div>
+				<div class="stat-grid">
+					<div class="stat">
+						<div class="num">38+</div>
+						<div class="lbl">Diseases Covered</div>
+					</div>
+					<div class="stat">
+						<div class="num">Smart</div>
+						<div class="lbl">Confidence Filtering</div>
+					</div>
+					<div class="stat">
+						<div class="num">Actionable</div>
+						<div class="lbl">Treatment Tips</div>
+					</div>
+				</div>
+			</div>
+			<div class="right card" id="learn">
+				<div class="leaf"></div>
+				<div class="mock">
+					<div class="bar">
+						<div class="dot"></div>
+						<div style="margin-left:8px; font-weight:600; letter-spacing:.3px;">Plant Disease Detector</div>
+					</div>
+					<div class="content">
+						<div class="tile">
+							<div class="sparkle"></div>
+							<div class="tile-content">
+								<h4>Upload</h4>
+								<p>Drop up to 15 leaf photos. JPEG recommended for best results.</p>
+							</div>
+						</div>
+						<div class="tile">
+							<div class="sparkle" style="animation-duration:22s;"></div>
+							<div class="tile-content">
+								<h4>Analyze</h4>
+								<p>The trained ML model inspects texture and color to spot disease indicators.</p>
+							</div>
+						</div>
+						<div class="tile">
+							<div class="sparkle" style="animation-duration:26s;"></div>
+							<div class="tile-content">
+								<h4>Confidence</h4>
+								<p>Smart filtering hides unsure results to avoid false alarms.</p>
+							</div>
+						</div>
+						<div class="tile">
+							<div class="sparkle" style="animation-duration:30s;"></div>
+							<div class="tile-content">
+								<h4>Treatment</h4>
+								<p>Clear guidance with optional product links to act quickly.</p>
+							</div>
+						</div>
+					</div>
+				</div>
+				<p class="small-note" style="padding:12px 16px 16px; margin:0;">
+					Note: This tool is for educational support and not a substitute for expert advice.
+				</p>
+			</div>
+		</section>
+	</div>
+	<!-- Learn section -->
+	<div class="learn-wrap" id="learn">
+		<div class="learn">
+			<div class="panel">
+				<h2>How it works</h2>
+				<p class="lead">Our model analyzes your leaf photos and returns the most likely disease along with confidence and treatment guidance.</p>
+				<ul class="checklist">
+					<li><span class="check">✓</span><div><strong>Upload</strong><br />Select up to 15 clear photos of a single leaf per image.</div></li>
+					<li><span class="check">✓</span><div><strong>Detect</strong><br />The trained ML model evaluates texture, color, and pattern features to identify diseases.</div></li>
+					<li><span class="check">✓</span><div><strong>Verify</strong><br />Low-confidence results are flagged as “Unknown” to reduce false alarms.</div></li>
+					<li><span class="check">✓</span><div><strong>Treat</strong><br />Receive disease description, treatment tips, and helpful links.</div></li>
+				</ul>
+			</div>
+			<div class="panel">
+				<h2>Tips for best results</h2>
+				<div class="kv">
+					<div class="k">Lighting</div><div class="v">Natural, even lighting works best—avoid harsh shadows.</div>
+					<div class="k">Focus</div><div class="v">Make sure the leaf is sharp and centered in the frame.</div>
+					<div class="k">Background</div><div class="v">Use a plain background if possible to reduce distractions.</div>
+					<div class="k">Angles</div><div class="v">Capture the diseased area clearly; multiple angles help when uncertain.</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<div class="footer">
+		Made with care for growers • <a href="{{ url_for('start') }}" style="color:var(--accent-2); text-decoration:none;">Begin now →</a>
+	</div>
+</body>
+</html>
+
+

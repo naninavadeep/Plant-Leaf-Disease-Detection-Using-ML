@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plant Disease Detection</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
+    <style>
+        html, body {
+            height: 100%;
+        }
+        body {
+            background: linear-gradient(120deg, #e0eafc 0%, #cfdef3 100%);
+            min-height: 100vh;
+            font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+        }
+        .hero-section {
+            background: linear-gradient(120deg, #3a3dff 0%, #6e7ff3 100%);
+            color: #fff;
+            border-bottom-left-radius: 36px;
+            border-bottom-right-radius: 36px;
+            box-shadow: 0 8px 32px rgba(58,61,255,0.10);
+            padding: 36px 0 24px 0;
+            position: relative;
+            overflow: hidden;
+        }
+        .hero-illustration {
+            width: 80px;
+            margin-bottom: 10px;
+            animation: floatY 2.5s ease-in-out infinite alternate;
+        }
+        @keyframes floatY {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-12px); }
+        }
+        .hero-title {
+            font-size: 2.2rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            margin-bottom: 0.3rem;
+        }
+        .hero-tagline {
+            font-size: 1.1rem;
+            font-weight: 400;
+            opacity: 0.92;
+            margin-bottom: 0.2rem;
+        }
+        .main-content {
+            flex: 1 0 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 60vh;
+        }
+        .upload-card {
+            background: rgba(255,255,255,0.97);
+            border-radius: 28px;
+            box-shadow: 0 8px 32px rgba(58,61,255,0.10);
+            padding: 2.2rem 2rem 2rem 2rem;
+            max-width: 480px;
+            width: 100%;
+            margin: 0 auto 40px auto;
+            animation: cardDropIn 1.2s cubic-bezier(.23,1.01,.32,1);
+        }
+        @keyframes cardDropIn {
+            0% { opacity: 0; transform: translateY(-40px) scale(0.98); }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .custom-upload-btn {
+            background: linear-gradient(90deg, #3a3dff 0%, #6e7ff3 100%);
+            border: none;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            color: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(58,61,255,0.10);
+            transition: background 0.3s, box-shadow 0.3s, transform 0.2s;
+            position: relative;
+            overflow: hidden;
+            padding: 0.85rem 1.5rem;
+        }
+        .custom-upload-btn:hover {
+            background: linear-gradient(90deg, #6e7ff3 0%, #3a3dff 100%);
+            box-shadow: 0 4px 16px rgba(58,61,255,0.15);
+            transform: translateY(-2px) scale(1.03);
+        }
+        .preview-area {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 1rem;
+        }
+        .preview-image {
+            max-width: 100px;
+            max-height: 100px;
+            border-radius: 8px;
+            border: 2px solid #eee;
+        }
+        .progress {
+            height: 8px;
+            border-radius: 8px;
+            margin-bottom: 1.2rem;
+        }
+        .footer {
+            font-size: 1rem;
+            background: #f8f9fa;
+            color: #888;
+            border-top: 1px solid #e0e0e0;
+            margin-top: 60px;
+        }
+        .footer .social-icons a {
+            color: #3a3dff;
+            margin: 0 8px;
+            font-size: 1.3rem;
+            transition: color 0.2s;
+        }
+        .footer .social-icons a:hover {
+            color: #6e7ff3;
+        }
+        
+        /* Camera styles */
+        #camera-section {
+            background: rgba(255,255,255,0.95);
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            border: 1px solid #e0e0e0;
+        }
+        
+        #camera-stream {
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+        }
+        
+        #capture-btn {
+            background: linear-gradient(90deg, #28a745 0%, #20c997 100%);
+            border: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        #capture-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(40, 167, 69, 0.3);
+        }
+        
+        #close-camera-btn {
+            background: linear-gradient(90deg, #6c757d 0%, #495057 100%);
+            border: none;
+            font-weight: 600;
+        }
+        
+        .camera-active {
+            background: linear-gradient(90deg, #007bff 0%, #0056b3 100%) !important;
+            color: white !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="hero-section text-center">
+        <div class="container">
+            <img src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f331.svg" class="hero-illustration" alt="Leaf Illustration">
+            <div class="hero-title">Plant Disease Detection</div>
+            <div class="hero-tagline">Powered by a trained ML model—instant and accurate. Upload a leaf image to get a prediction with guidance.</div>
+        </div>
+    </div>
+    <div class="main-content">
+        <div class="upload-card shadow-lg">
+            <form id="upload-form" action="{{ url_for('predict') }}" method="POST" enctype="multipart/form-data">
+                {% if error %}
+                    <div class="alert alert-danger">{{ error }}</div>
+                {% endif %}
+
+                <div class="mb-3">
+                    <label for="image" class="form-label fw-bold">Upload or Capture an Image</label>
+                    <div class="input-group mb-3">
+                        <input type="file" name="image" id="image" class="form-control" accept="image/*" multiple onchange="previewImages(event)">
+                        <button class="btn btn-outline-primary" type="button" id="camera-btn">
+                            <i class="bi bi-camera-fill"></i> Camera
+                        </button>
+                    </div>
+                    <div class="mt-2">
+                        <small class="text-muted">
+                            <i class="bi bi-info-circle"></i> 
+                            <strong>Tip:</strong> Use clear, close-up leaf images from your dataset classes.
+                        </small>
+                    </div>
+                </div>
+                
+                <!-- Camera Section -->
+                <div id="camera-section" class="text-center mb-4" style="display: none;">
+                    <video id="camera-stream" class="w-100 rounded mb-3" autoplay playsinline style="max-width: 400px; border: 2px solid #ddd;"></video>
+                    <canvas id="capture-canvas" style="display: none;"></canvas>
+                    <div id="camera-error" class="alert alert-danger" style="display: none;">
+                        Could not access camera. Please ensure you've granted camera permissions.
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button type="button" class="btn btn-success" id="capture-btn">
+                            <i class="bi bi-camera"></i> Capture Photo
+                        </button>
+                        <button type="button" class="btn btn-secondary" id="close-camera-btn">
+                            <i class="bi bi-x-circle"></i> Close Camera
+                        </button>
+                    </div>
+                    <p class="text-muted small mt-2">Point camera at a plant leaf and capture the photo</p>
+                </div>
+                <div class="preview-area" id="preview-area">
+                    <!-- Image previews will be added here -->
+                </div>
+                <div class="progress d-none mt-3" id="upload-progress">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary" role="progressbar" style="width: 0%"></div>
+                </div>
+                <div class="d-grid mt-3">
+                    <button type="submit" class="btn custom-upload-btn btn-lg"><i class="bi bi-search me-2"></i>Detect Disease</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <footer class="footer py-3 border-top">
+        <div class="container text-center">
+            <div class="mb-2 social-icons">
+                <a href="https://github.com/" target="_blank"><i class="bi bi-github"></i></a>
+                <a href="https://twitter.com/" target="_blank"><i class="bi bi-twitter"></i></a>
+                <a href="https://linkedin.com/" target="_blank"><i class="bi bi-linkedin"></i></a>
+            </div>
+            <span class="text-muted">&copy; 2025 Plant Disease Detection &mdash; Powered by a trained machine learning (deep learning) model</span>
+        </div>
+    </footer>
+    <script>
+        const MAX_FILES = 15;
+
+        function previewImages(event) {
+            const previewArea = document.getElementById('preview-area');
+            const files = event.target.files;
+
+            if (files.length > MAX_FILES) {
+                alert(`You can only upload a maximum of ${MAX_FILES} images.`);
+                event.target.value = ""; // Clear the file input
+                previewArea.innerHTML = ''; // Clear previews
+                return;
+            }
+
+            previewArea.innerHTML = ''; // Clear previous previews
+            for (const file of files) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.classList.add('preview-image');
+                    previewArea.appendChild(img);
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // Progress bar animation (fake for demo, real would require AJAX)
+        document.getElementById('upload-form').addEventListener('submit', function(e) {
+            const progress = document.getElementById('upload-progress');
+            const bar = progress.querySelector('.progress-bar');
+            progress.classList.remove('d-none');
+            let width = 0;
+            const interval = setInterval(() => {
+                width += 10;
+                bar.style.width = width + '%';
+                if (width >= 100) {
+                    clearInterval(interval);
+                }
+            }, 80);
+        });
+
+        // Camera Implementation
+        const cameraBtn = document.getElementById('camera-btn');
+        const cameraSection = document.getElementById('camera-section');
+        const video = document.getElementById('camera-stream');
+        const canvas = document.getElementById('capture-canvas');
+        const captureBtn = document.getElementById('capture-btn');
+        const closeCameraBtn = document.getElementById('close-camera-btn');
+        const imageInput = document.getElementById('image');
+        let mediaStream = null;
+
+        // Camera button click handler
+        cameraBtn.addEventListener('click', async () => {
+            try {
+                // Show camera section
+                cameraSection.style.display = 'block';
+                cameraBtn.style.display = 'none';
+                
+                // Initialize camera
+                mediaStream = await navigator.mediaDevices.getUserMedia({
+                    video: { 
+                        facingMode: 'environment',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    },
+                    audio: false
+                });
+                
+                video.srcObject = mediaStream;
+                document.getElementById('camera-error').style.display = 'none';
+                
+            } catch (err) {
+                console.error('Camera error:', err);
+                document.getElementById('camera-error').style.display = 'block';
+                cameraSection.style.display = 'none';
+                cameraBtn.style.display = 'block';
+            }
+        });
+
+        // Close camera button
+        closeCameraBtn.addEventListener('click', () => {
+            stopCamera();
+            cameraSection.style.display = 'none';
+            cameraBtn.style.display = 'block';
+        });
+
+        // Capture photo button
+        captureBtn.addEventListener('click', () => {
+            if (!mediaStream) return;
+            
+            // Set canvas dimensions to match video
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            // Draw video frame to canvas
+            const context = canvas.getContext('2d');
+            context.drawImage(video, 0, 0);
+            
+            // Convert canvas to blob and create file
+            canvas.toBlob(blob => {
+                const file = new File([blob], 'camera-capture.jpg', { type: 'image/jpeg' });
+                
+                // Create DataTransfer object and add the file
+                const dataTransfer = new DataTransfer();
+                dataTransfer.items.add(file);
+                imageInput.files = dataTransfer.files;
+                
+                // Trigger preview
+                previewImages({target: imageInput});
+                
+                // Stop camera and hide section
+                stopCamera();
+                cameraSection.style.display = 'none';
+                cameraBtn.style.display = 'block';
+                
+                // Show success message
+                const successMsg = document.createElement('div');
+                successMsg.className = 'alert alert-success alert-dismissible fade show';
+                successMsg.innerHTML = `
+                    <i class="bi bi-check-circle"></i> Photo captured successfully! Ready for analysis.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                `;
+                cameraSection.parentNode.insertBefore(successMsg, cameraSection.nextSibling);
+                
+            }, 'image/jpeg', 0.9);
+        });
+
+        function stopCamera() {
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+                mediaStream = null;
+                video.srcObject = null;
+            }
+        }
+
+        // Clean up camera when page is unloaded
+        window.addEventListener('beforeunload', stopCamera);
+    </script>
+</body>
+</html>

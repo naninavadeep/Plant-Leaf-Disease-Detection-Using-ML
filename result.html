@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plant Disease Detection Result</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
+    <style>
+        html, body {
+            height: 100%;
+        }
+        body {
+            background: linear-gradient(120deg, #e0eafc 0%, #cfdef3 100%);
+            min-height: 100vh;
+            font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+        }
+        .hero-section {
+            background: linear-gradient(120deg, #3a3dff 0%, #6e7ff3 100%);
+            color: #fff;
+            border-bottom-left-radius: 36px;
+            border-bottom-right-radius: 36px;
+            box-shadow: 0 8px 32px rgba(58,61,255,0.10);
+            padding: 36px 0 24px 0;
+            position: relative;
+            overflow: hidden;
+        }
+        .hero-illustration {
+            width: 80px;
+            margin-bottom: 10px;
+            animation: floatY 2.5s ease-in-out infinite alternate;
+        }
+        @keyframes floatY {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-12px); }
+        }
+        .hero-title {
+            font-size: 2.2rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            margin-bottom: 0.3rem;
+        }
+        .hero-tagline {
+            font-size: 1.1rem;
+            font-weight: 400;
+            opacity: 0.92;
+            margin-bottom: 0.2rem;
+        }
+        .main-content {
+            flex: 1 0 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 60vh;
+        }
+        .result-card {
+            background: rgba(255,255,255,0.97);
+            border-radius: 28px;
+            box-shadow: 0 8px 32px rgba(58,61,255,0.10);
+            padding: 2.2rem 2rem 2rem 2rem;
+            max-width: 540px;
+            width: 100%;
+            margin: 0 auto 40px auto;
+            animation: cardDropIn 1.2s cubic-bezier(.23,1.01,.32,1);
+        }
+        @keyframes cardDropIn {
+            0% { opacity: 0; transform: translateY(-40px) scale(0.98); }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .result-header {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #3a3dff;
+            margin-bottom: 1.2rem;
+            letter-spacing: 0.5px;
+        }
+        .result-section {
+            margin-bottom: 1.2rem;
+        }
+        .result-label {
+            font-weight: 600;
+            color: #6e7ff3;
+            margin-bottom: 0.2rem;
+        }
+        .result-value {
+            font-size: 1.1rem;
+            font-weight: 500;
+            color: #222;
+        }
+        .analyzed-image {
+            display: block;
+            margin: 0 auto 1.2rem auto;
+            max-width: 220px;
+            max-height: 140px;
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(58,61,255,0.10);
+            border: 2px solid #e0e0e0;
+            background: #f3f3fa;
+            animation: previewFloat 1.2s cubic-bezier(.23,1.01,.32,1);
+        }
+        @keyframes previewFloat {
+            0% { opacity: 0; transform: translateY(40px) scale(0.98); }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .btn-custom {
+            background: linear-gradient(90deg, #3a3dff 0%, #6e7ff3 100%);
+            border: none;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            color: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(58,61,255,0.10);
+            transition: background 0.3s, box-shadow 0.3s, transform 0.2s;
+            padding: 0.85rem 1.5rem;
+        }
+        .btn-custom:hover {
+            background: linear-gradient(90deg, #6e7ff3 0%, #3a3dff 100%);
+            box-shadow: 0 4px 16px rgba(58,61,255,0.15);
+            transform: translateY(-2px) scale(1.03);
+        }
+        .footer {
+            font-size: 1rem;
+            background: #f8f9fa;
+            color: #888;
+            border-top: 1px solid #e0e0e0;
+            margin-top: 60px;
+        }
+        .footer .social-icons a {
+            color: #3a3dff;
+            margin: 0 8px;
+            font-size: 1.3rem;
+            transition: color 0.2s;
+        }
+        .footer .social-icons a:hover {
+            color: #6e7ff3;
+        }
+    </style>
+</head>
+<body>
+    <div class="hero-section text-center">
+        <div class="container">
+            <img src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f331.svg" class="hero-illustration" alt="Leaf Illustration">
+            <div class="hero-title">Plant Disease Detection</div>
+            <div class="hero-tagline">AI-powered, instant, and accurate. Here are your results.</div>
+        </div>
+    </div>
+    <div class="main-content">
+        <div class="container">
+            <div class="row">
+                {% for result in results %}
+                <div class="col-lg-6 mb-4">
+                    <div class="result-card h-100">
+                        <h3 class="result-header">Analysis Result</h3>
+                        <img src="data:image/jpeg;base64,{{ result.image }}" alt="Uploaded Image" class="analyzed-image">
+                        
+                        {% if result.validation_error %}
+                            <div class="result-section">
+                                <div class="result-label text-danger">
+                                    {% if result.error_type == 'unsupported_plant' %}
+                                        <i class="bi bi-exclamation-triangle"></i> Plant Not Supported
+                                    {% elif result.error_type == 'low_confidence' %}
+                                        <i class="bi bi-question-circle"></i> Low Confidence
+                                    {% else %}
+                                        <i class="bi bi-exclamation-triangle"></i> Validation Error
+                                    {% endif %}
+                                </div>
+                                <div class="result-value text-danger">{{ result.disease_name }}</div>
+                            </div>
+                            
+                            <div class="result-section">
+                                <div class="result-label">Description:</div>
+                                <div class="result-value">{{ result.treatment.description }}</div>
+                            </div>
+                            
+                            <div class="result-section">
+                                <div class="result-label">Recommendation:</div>
+                                <div class="result-value">{{ result.treatment.treatment | safe }}</div>
+                            </div>
+                            
+                            
+                        {% else %}
+                            <div class="result-section">
+                                <div class="result-label">Detected Disease:</div>
+                                <div class="result-value">{{ result.disease_name }}</div>
+                            </div>
+                            
+                            <div class="result-section">
+                                <div class="result-label">Confidence:</div>
+                                <div class="result-value">{{ result.confidence }}</div>
+                            </div>
+                            
+                            <div class="result-section">
+                                <div class="result-label">Description:</div>
+                                <div class="result-value">{{ result.treatment.description }}</div>
+                            </div>
+                            
+                            <div class="result-section">
+                                <div class="result-label">Treatment:</div>
+                                <div class="result-value">{{ result.treatment.treatment | safe }}</div>
+                            </div>
+
+                            <div class="result-section">
+                                <div class="result-label">Recommended Supplement:</div>
+                                <a href="{{ result.treatment.link }}" target="_blank" class="result-value">{{ result.treatment.supplement }}</a>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="text-center mt-4">
+                <a href="/" class="btn btn-custom">Analyze More Images</a>
+            </div>
+        </div>
+    </div>
+    <footer class="footer py-3 border-top">
+        <div class="container text-center">
+            <div class="mb-2 social-icons">
+                <a href="https://github.com/" target="_blank"><i class="bi bi-github"></i></a>
+                <a href="https://twitter.com/" target="_blank"><i class="bi bi-twitter"></i></a>
+                <a href="https://linkedin.com/" target="_blank"><i class="bi bi-linkedin"></i></a>
+            </div>
+            <span class="text-muted">&copy; 2025 Plant Disease Detection | Powered by AI &amp; Deep Learning</span>
+        </div>
+    </footer>
+</body>
+</html>
